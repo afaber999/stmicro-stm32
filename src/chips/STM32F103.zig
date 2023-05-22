@@ -172,7 +172,7 @@ pub const devices = struct {
             ///  General purpose I/O
             pub const GPIOB = @ptrCast(*volatile types.GPIOA, 0x40010c00);
             ///  General purpose I/O
-            pub const GPIOC = @ptrCast(*volatile types.GPIOA, 0x40011000);
+            pub const GPIOC = @intToPtr(*volatile types.GPIOA, 0x40011000);
             ///  General purpose I/O
             pub const GPIOD = @ptrCast(*volatile types.GPIOA, 0x40011400);
             ///  General purpose I/O
@@ -208,7 +208,7 @@ pub const devices = struct {
             ///  DMA controller
             pub const DMA2 = @ptrCast(*volatile types.DMA1, 0x40020400);
             ///  Reset and clock control
-            pub const RCC = @ptrCast(*volatile types.RCC, 0x40021000);
+            pub const RCC = @intToPtr(*volatile types.RCC, 0x40021000);
             ///  FLASH
             pub const FLASH = @ptrCast(*volatile types.FLASH, 0x40022000);
             ///  CRC calculation unit
