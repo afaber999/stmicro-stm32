@@ -30,6 +30,8 @@ inline fn set_reg_field(reg: anytype, comptime field_name: anytype, value: anyty
 }
 
 pub const gpio = struct {
+    pub const State = microzig.core.experimental.gpio.State;
+
     pub inline fn enable_port(comptime pin: type) void {
         set_reg_field(&peripherals.RCC.APB2ENR, "IOP" ++ pin.gpio_port_name ++ "EN", 0b1);
     }
@@ -49,21 +51,67 @@ pub const gpio = struct {
         set_reg_field(@field(pin.gpio_port, "MODER"), "MODER" ++ pin.suffix, 0b00);
     }
 
-    pub fn read(comptime pin: type) microzig.gpio.State {
+    pub fn read(comptime pin: type) State {
         const idr_reg = pin.gpio_port.IDR;
         const reg_value = @field(idr_reg.read(), "IDR" ++ pin.suffix); // TODO extract to getRegField()?
-        return @intToEnum(microzig.gpio.State, reg_value);
+        return @intToEnum(State, reg_value);
     }
 
-    pub fn write(comptime pin: type, state: microzig.gpio.State) void {
-        const val = switch (state) {
-            .low => 0,
-            .high => 1,
-        };
-        set_reg_field(pin.gpio_port.ODR, "ODR" ++ pin.suffix, val);
+    pub inline fn write(comptime pin: type, state: State) void {
+        switch (state) {
+            .low => set_reg_field(&pin.gpio_port.BRR, "BR" ++ pin.suffix, 1),
+            .high => set_reg_field(&pin.gpio_port.BSRR, "BS" ++ pin.suffix, 1),
+        }
+        // const val = state.value();
+        // set_reg_field(&pin.gpio_port.ODR, "ODR" ++ pin.suffix, val);
     }
+
+
 
     pub fn toggle(comptime pin: type) void {
         _ = pin;
     }
 };
+
+
+pub fn debug_log(msg: []const u8) void {
+    const msg_ptr = @ptrToInt(&msg[0]);
+
+    asm volatile (
+        \\mov r0, #0x04
+        \\mov r1, %[str]
+        \\nop
+        \\bkpt #0xAB
+        :
+        : [str] "r" (msg_ptr),
+        : "r0", "r1"
+    );
+}
+
+pub fn to_hex(val: u8) u8 {
+    return if (val < 10) {
+        return @as(u8, val) + '0';
+    } else {
+        return @as(u8, val) - 10 + 'A';
+    };
+}
+
+pub fn debug_print_hex(value: anytype) void {
+    //    debug_print_int(value, 16);
+    var buf: [11]u8 = undefined;
+    buf[10] = 0;
+    buf[2] = '?';
+
+    var idx: u32 = 9;
+    var val = value;
+
+    while (idx > 1) : (idx -= 1) {
+        buf[idx] = to_hex(@intCast(u8, val % 16));
+        val = val / 16;
+    }
+
+    buf[1] = 'X';
+    buf[0] = '0';
+    debug_log(&buf);
+}
+
