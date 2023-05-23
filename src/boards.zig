@@ -10,6 +10,12 @@ fn root() []const u8 {
 
 const root_path = root() ++ "/";
 
+pub const stm32f1bluepill = Board{
+    .name = "STM32F1BLUEPILL",
+    .source = .{ .path = root_path ++ "boards/STM32F1BLUEPILL.zig" },
+    .chip = chips.stm32f103x8,
+};
+
 pub const stm32f3discovery = Board{
     .name = "STM32F3DISCOVERY",
     .source = .{ .path = root_path ++ "boards/STM32F3DISCOVERY.zig" },
