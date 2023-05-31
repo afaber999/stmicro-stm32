@@ -5,52 +5,11 @@ const microzig = @import("microzig");
 pub const usb = @import("usb.zig");
 pub const uart = @import("uart.zig");
 pub const semihosting = @import("semihosting.zig");
-
 pub const peripherals = microzig.chip.peripherals;
-pub const RCC = microzig.peripherals.RCC;
+pub const rcc = @import("rcc.zig");
 
-pub var sys_clk = 8_000_000;
-
-// setup clocks
-fn setup_max_clocks() void {
-    sys_clk = 72_000_000;
-
-    // Conf clock : 72MHz using HSE 8MHz crystal w/ PLL X 9 (8MHz x 9 = 72MHz)
-
-    // Two wait states, per datasheet
-    peripherals.FLASH.ACR.modify(.{ .LATENCY = 2 });
-
-    // APB Low speed prescaler (APB1) max 36 MHz -> prescale APB1 = HCLK/2
-    peripherals.RCC.CFGR.modify(.{ .PPRE1 = 0b100 });
-
-    // USBPRE to 1.5 (max 48 Mhz = 72 / 1.5)
-    peripherals.RCC.CFGR.modify(.{ .OTGFSPRE = 0b0 });
-
-    // enable HSE clock
-    peripherals.RCC.CR.modify(.{ .HSEON = 0b1 });
-
-    // wait for the HSEREADY flag
-    while (peripherals.RCC.CR.read().HSERDY != 0b1) {}
-
-    // set PLL source to HSE
-    peripherals.RCC.CFGR.modify(.{ .PLLSRC = 0b1 });
-
-    // multiply PLL * 9 -> 72 MHz
-    peripherals.RCC.CFGR.modify(.{ .PLLMUL = 0b0111 });
-
-    // enable PLL
-    peripherals.RCC.CR.modify(.{ .PLLON = 0b1 });
-
-    // wait for the PLL ready flag
-    while (peripherals.RCC.CR.read().PLLRDY != 0b1) {}
-
-    // set clock source to PLL
-    peripherals.RCC.CFGR.modify(.{ .SW = 0b10 });
-
-    // wait for the PLL to be CLK
-    while (peripherals.RCC.CFGR.read().SWS != 0b10) {}
-}
-
+// AF how to connect to board?
+pub var clocks = rcc.create_clocks(8_000_000);
 
 pub fn parse_pin(comptime spec: []const u8) type {
     const invalid_format_msg = "The given pin '" ++ spec ++ "' has an invalid format. Pins must follow the format \"P{Port}{Pin}\" scheme.";
@@ -119,4 +78,3 @@ pub const gpio = struct {
         }
     }
 };
-
