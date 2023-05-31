@@ -2,9 +2,55 @@ const std = @import("std");
 const runtime_safety = std.debug.runtime_safety;
 
 const microzig = @import("microzig");
+pub const usb = @import("usb.zig");
+pub const uart = @import("uart.zig");
+pub const semihosting = @import("semihosting.zig");
 
 pub const peripherals = microzig.chip.peripherals;
 pub const RCC = microzig.peripherals.RCC;
+
+pub var sys_clk = 8_000_000;
+
+// setup clocks
+fn setup_max_clocks() void {
+    sys_clk = 72_000_000;
+
+    // Conf clock : 72MHz using HSE 8MHz crystal w/ PLL X 9 (8MHz x 9 = 72MHz)
+
+    // Two wait states, per datasheet
+    peripherals.FLASH.ACR.modify(.{ .LATENCY = 2 });
+
+    // APB Low speed prescaler (APB1) max 36 MHz -> prescale APB1 = HCLK/2
+    peripherals.RCC.CFGR.modify(.{ .PPRE1 = 0b100 });
+
+    // USBPRE to 1.5 (max 48 Mhz = 72 / 1.5)
+    peripherals.RCC.CFGR.modify(.{ .OTGFSPRE = 0b0 });
+
+    // enable HSE clock
+    peripherals.RCC.CR.modify(.{ .HSEON = 0b1 });
+
+    // wait for the HSEREADY flag
+    while (peripherals.RCC.CR.read().HSERDY != 0b1) {}
+
+    // set PLL source to HSE
+    peripherals.RCC.CFGR.modify(.{ .PLLSRC = 0b1 });
+
+    // multiply PLL * 9 -> 72 MHz
+    peripherals.RCC.CFGR.modify(.{ .PLLMUL = 0b0111 });
+
+    // enable PLL
+    peripherals.RCC.CR.modify(.{ .PLLON = 0b1 });
+
+    // wait for the PLL ready flag
+    while (peripherals.RCC.CR.read().PLLRDY != 0b1) {}
+
+    // set clock source to PLL
+    peripherals.RCC.CFGR.modify(.{ .SW = 0b10 });
+
+    // wait for the PLL to be CLK
+    while (peripherals.RCC.CFGR.read().SWS != 0b10) {}
+}
+
 
 pub fn parse_pin(comptime spec: []const u8) type {
     const invalid_format_msg = "The given pin '" ++ spec ++ "' has an invalid format. Pins must follow the format \"P{Port}{Pin}\" scheme.";
@@ -23,7 +69,7 @@ pub fn parse_pin(comptime spec: []const u8) type {
     };
 }
 
-inline fn set_reg_field(reg: anytype, comptime field_name: anytype, value: anytype) void {
+pub inline fn set_reg_field(reg: anytype, comptime field_name: anytype, value: anytype) void {
     var temp = reg.read();
     @field(temp, field_name) = value;
     reg.write(temp);
@@ -52,8 +98,8 @@ pub const gpio = struct {
     }
 
     pub fn read(comptime pin: type) State {
-        const idr_reg = pin.gpio_port.IDR;
-        const reg_value = @field(idr_reg.read(), "IDR" ++ pin.suffix); // TODO extract to getRegField()?
+        const idr_reg = pin.gpio_port.IDR.read();
+        const reg_value = @field(idr_reg, "IDR" ++ pin.suffix); // TODO extract to getRegField()?
         return @intToEnum(State, reg_value);
     }
 
@@ -66,52 +112,11 @@ pub const gpio = struct {
         // set_reg_field(&pin.gpio_port.ODR, "ODR" ++ pin.suffix, val);
     }
 
-
-
     pub fn toggle(comptime pin: type) void {
-        _ = pin;
+        switch (read(pin)) {
+            State.low => write(pin, State.high),
+            State.high => write(pin, State.low),
+        }
     }
 };
-
-
-pub fn debug_log(msg: []const u8) void {
-    const msg_ptr = @ptrToInt(&msg[0]);
-
-    asm volatile (
-        \\mov r0, #0x04
-        \\mov r1, %[str]
-        \\nop
-        \\bkpt #0xAB
-        :
-        : [str] "r" (msg_ptr),
-        : "r0", "r1"
-    );
-}
-
-pub fn to_hex(val: u8) u8 {
-    return if (val < 10) {
-        return @as(u8, val) + '0';
-    } else {
-        return @as(u8, val) - 10 + 'A';
-    };
-}
-
-pub fn debug_print_hex(value: anytype) void {
-    //    debug_print_int(value, 16);
-    var buf: [11]u8 = undefined;
-    buf[10] = 0;
-    buf[2] = '?';
-
-    var idx: u32 = 9;
-    var val = value;
-
-    while (idx > 1) : (idx -= 1) {
-        buf[idx] = to_hex(@intCast(u8, val % 16));
-        val = val / 16;
-    }
-
-    buf[1] = 'X';
-    buf[0] = '0';
-    debug_log(&buf);
-}
 
