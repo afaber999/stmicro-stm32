@@ -3,7 +3,10 @@ pub const micro = @import("microzig");
 pub const cpu_frequency = 8_000_000;
 
 pub const pin_map = .{
-	// onboard LED
+    .USB_ENABLE = "PA7",
+    .USB_DM = "PA11",
+    .USB_DP = "PA12",
+    // onboard LED
     .LED = "PC13",
 };
 

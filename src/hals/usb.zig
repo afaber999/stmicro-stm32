@@ -392,11 +392,11 @@ pub const F = struct {
     }
 
     /// Check which interrupt flags are set
-    /// AF FIX
-    // pub fn get_interrupts() usb.InterruptStatus {
-    //     const ints = peripherals.USBCTRL_REGS.INTS.read();
+    pub fn get_interrupts() usb.InterruptStatus {
+//        const ints = peripherals.USBCTRL_REGS.INTS.read();
 
-    //     return .{
+         return .{
+         };
     //         .BuffStatus = if (ints.BUFF_STATUS == 1) true else false,
     //         .BusReset = if (ints.BUS_RESET == 1) true else false,
     //         .DevConnDis = if (ints.DEV_CONN_DIS == 1) true else false,
@@ -404,7 +404,7 @@ pub const F = struct {
     //         .DevResumeFromHost = if (ints.DEV_RESUME_FROM_HOST == 1) true else false,
     //         .SetupReq = if (ints.SETUP_REQ == 1) true else false,
     //     };
-    // }
+    }
 
     /// Returns a received USB setup packet
     ///
@@ -426,10 +426,10 @@ pub const F = struct {
         // we can't just treat it as bytes. Instead, copy it out to a byte
         // array.
         var setup_packet: [8]u8 = .{0} ** 8;
-        const spl: u32 = peripherals.USBCTRL_DPRAM.SETUP_PACKET_LOW.raw;
-        _ = spl;
-        const sph: u32 = peripherals.USBCTRL_DPRAM.SETUP_PACKET_HIGH.raw;
-        _ = sph;
+        // const spl: u32 = peripherals.USBCTRL_DPRAM.SETUP_PACKET_LOW.raw;
+        // _ = spl;
+        // const sph: u32 = peripherals.USBCTRL_DPRAM.SETUP_PACKET_HIGH.raw;
+        // _ = sph;
         // AF _ = rom.memcpy(setup_packet[0..4], std.mem.asBytes(&spl));
         // AF _ = rom.memcpy(setup_packet[4..8], std.mem.asBytes(&sph));
         // Reinterpret as setup packet
@@ -439,17 +439,18 @@ pub const F = struct {
     /// Called on a bus reset interrupt
     pub fn bus_reset() void {
         // Acknowledge by writing the write-one-to-clear status bit.
-        peripherals.USBCTRL_REGS.SIE_STATUS.modify(.{ .BUS_RESET = 1 });
-        peripherals.USBCTRL_REGS.ADDR_ENDP.modify(.{ .ADDRESS = 0 });
+        //peripherals.USBCTRL_REGS.SIE_STATUS.modify(.{ .BUS_RESET = 1 });
+        //peripherals.USBCTRL_REGS.ADDR_ENDP.modify(.{ .ADDRESS = 0 });
     }
 
     pub fn set_address(addr: u7) void {
-        peripherals.USBCTRL_REGS.ADDR_ENDP.modify(.{ .ADDRESS = addr });
+        _ = addr;
+        // peripherals.USBCTRL_REGS.ADDR_ENDP.modify(.{ .ADDRESS = addr });
     }
 
     pub fn get_EPBIter(dc: *const usb.DeviceConfiguration) usb.EPBIter {
         return .{
-            .bufbits = peripherals.USBCTRL_REGS.BUFF_STATUS.raw,
+            .bufbits = 0, //  peripherals.USBCTRL_REGS.BUFF_STATUS.raw,
             .device_config = dc,
             .next = next,
         };
@@ -603,8 +604,9 @@ pub fn modify_endpoint_control(
 
 pub fn next(self: *usb.EPBIter) ?usb.EPB {
     if (self.last_bit) |lb| {
+        _ = lb;
         // Acknowledge the last handled buffer
-        peripherals.USBCTRL_REGS.BUFF_STATUS.write_raw(lb);
+        //peripherals.USBCTRL_REGS.BUFF_STATUS.write_raw(lb);
         self.last_bit = null;
     }
     // All input buffers handled?

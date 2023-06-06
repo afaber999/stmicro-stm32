@@ -97,7 +97,7 @@ pub const gpio = struct {
         af15,
     };
 
-    pub fn set_output(comptime pin: type) void {
+    pub fn set_mode(comptime pin: type) void {
         set_reg_field(RCC.AHB1ENR, "GPIO" ++ pin.gpio_port_name ++ "EN", 1);
         set_reg_field(@field(pin.gpio_port, "MODER"), "MODER" ++ pin.suffix, 0b01);
     }

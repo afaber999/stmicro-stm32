@@ -7,8 +7,11 @@ const time = @import("time.zig");
 const UartRegs = microzig.chip.types.USART1;
 pub const Self = @This();
 
-pub fn num(n: u2) USART {
-    return @intToEnum(USART, n);
+pub fn num(comptime n: u2) USART {
+    if (n != 1 and n != 2 and n != 2) {
+        @compileError("Invalid UART, use 1,2,3");
+    }
+    return @intToEnum(USART, n - 1);
 }
 
 pub const USART = enum(u2) {
@@ -159,7 +162,7 @@ var usart_logger: ?USART.Writer = null;
 
 pub fn init_logger(usart: USART) void {
     usart_logger = usart.writer();
-    usart_logger.?.writeAll("\r\n================ STARTING NEW LOGGER ================\r\n") catch {};
+    usart_logger.?.writeAll("\r\n================ START LOGGER ================\r\n") catch {};
 }
 
 pub fn log(
@@ -168,21 +171,19 @@ pub fn log(
     comptime format: []const u8,
     args: anytype,
 ) void {
-    const level_prefix = comptime "[{}.{:0>6}] " ++ level.asText();
+    const level_prefix = comptime "[{}.{}] " ++ level.asText();
     const prefix = comptime level_prefix ++ switch (scope) {
         .default => ": ",
         else => " (" ++ @tagName(scope) ++ "): ",
     };
 
     if (usart_logger) |uart| {
-        const current_time = time.get_time_since_boot();
-        const seconds = current_time.to_us() / std.time.us_per_s;
-        const microseconds = current_time.to_us() % std.time.us_per_s;
-
+        const seconds = hal.systick.seconds();
+        const microseconds = hal.systick.micros();
         uart.print(prefix ++ format ++ "\r\n", .{ seconds, microseconds } ++ args) catch {};
+        //        uart.print(level.asText() ++ " " ++ format ++ "\r\n", args) catch {};
     }
 }
-
 
 pub const interrupts = struct {
     pub fn USART1() void {}

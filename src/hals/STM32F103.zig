@@ -8,6 +8,7 @@ pub const semihosting = @import("semihosting.zig");
 pub const peripherals = microzig.chip.peripherals;
 pub const rcc = @import("rcc.zig");
 pub const rtc = @import("rtc.zig");
+pub const i2c = @import("i2c_v1.zig");
 pub const systick = @import("systick.zig");
 
 pub const clock = struct {
@@ -54,25 +55,56 @@ pub inline fn set_reg_field(reg: anytype, comptime field_name: anytype, value: a
 }
 
 pub const gpio = struct {
+    pub const OutputSpeed = enum {
+        output_10MHz,
+        output_2MHz,
+        output_50MHz,
+    };
+    pub const OutputMode = enum {
+        pushpull,
+        opendrain,
+        alternate_pushpull,
+        alternate_opendrain,
+    };
+    pub const InputMode = enum {
+        analog,
+        floating,
+        pullupdown,
+    };
+
     pub const State = microzig.core.experimental.gpio.State;
 
     pub inline fn enable_port(comptime pin: type) void {
+        peripherals.RCC.APB2ENR.modify(.{ .AFIOEN = 0b1 });
         set_reg_field(&peripherals.RCC.APB2ENR, "IOP" ++ pin.gpio_port_name ++ "EN", 0b1);
     }
 
-    pub inline fn set_output(comptime pin: type) void {
+    pub inline fn set_output(comptime pin: type, mode: OutputMode, speed: OutputSpeed) void {
         enable_port(pin);
         comptime var rg = switch (pin.pin_number) {
             0...7 => "CRL",
             8...15 => "CRH",
             else => unreachable,
         };
-        set_reg_field(&@field(pin.gpio_port, rg), "MODE" ++ pin.suffix, 0b01);
+        const cnf_val = @enumToInt(mode);
+        const mode_val = @enumToInt(speed) + 1;
+
+        set_reg_field(&@field(pin.gpio_port, rg), "CNF" ++ pin.suffix, cnf_val);
+        set_reg_field(&@field(pin.gpio_port, rg), "MODE" ++ pin.suffix, mode_val);
     }
 
-    pub inline fn set_input(comptime pin: type) void {
+    pub inline fn set_input(comptime pin: type, mode: InputMode) void {
         enable_port(pin);
-        set_reg_field(@field(pin.gpio_port, "MODER"), "MODER" ++ pin.suffix, 0b00);
+        comptime var rg = switch (pin.pin_number) {
+            0...7 => "CRL",
+            8...15 => "CRH",
+            else => unreachable,
+        };
+        const cnf_val = @enumToInt(mode);
+        const mode_val = 0b00;
+
+        set_reg_field(&@field(pin.gpio_port, rg), "CNF" ++ pin.suffix, cnf_val);
+        set_reg_field(&@field(pin.gpio_port, rg), "MODE" ++ pin.suffix, mode_val);
     }
 
     pub fn read(comptime pin: type) State {
@@ -97,7 +129,6 @@ pub const gpio = struct {
         }
     }
 };
-
 
 pub const interrupt_handler_structs = [_]type{
     usart.interrupts,
