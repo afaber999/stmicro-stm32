@@ -79,10 +79,12 @@ pub var EP0_IN_CFG: usb.EndpointConfiguration = .{
 
 /// USB data buffers
 pub const buffers = struct {
-    // Address 0x100-0xfff (3840 bytes) can be used for data buffers.
+    // PMA mem (512 bytes) can be used for data buffers.
     const USBDPRAM_BASE = 0x50100100;
+
     // Data buffers are 64 bytes long as this is the max normal packet size
     const BUFFER_SIZE = 64;
+
     /// EP0 buffer 0 (shared between in and out)
     const USB_EP0_BUFFER0 = USBDPRAM_BASE;
     /// Optional EP0 buffer 1
@@ -131,51 +133,55 @@ pub const F = struct {
     /// This requres that the system clock has been set up before hand
     /// using the 12 MHz crystal.
     pub fn usb_init_clk() void {
-
-
         gpio.enable_port(USBM_PIN);
-
-        // Bring PLL_USB up to 48MHz
-        
-        // . PLL_USB is clocked from refclk, which we've
-        // already moved over to the 12MHz XOSC. We just need to make it x4 that
-
-        // clock.
-        //
-        // PLL_USB out of reset
-        // resets.reset(.{ .pll_usb = true });
-        // // Configure it:
-        // //
-        // // RFDIV = 1
-        // // FBDIV = 100 => FOUTVC0 = 1200 MHz
-        // peripherals.PLL_USB.CS.modify(.{ .REFDIV = 1 });
-        // peripherals.PLL_USB.FBDIV_INT.modify(.{ .FBDIV_INT = 100 });
-        // peripherals.PLL_USB.PWR.modify(.{ .PD = 0, .VCOPD = 0 });
-        // // Wait for lock
-        // while (peripherals.PLL_USB.CS.read().LOCK == 0) {}
-        // // Set up post dividers to enable output
-        // //
-        // // POSTDIV1 = POSTDIV2 = 5
-        // // PLL_USB FOUT = 1200 MHz / 25 = 48 MHz
-        // peripherals.PLL_USB.PRIM.modify(.{ .POSTDIV1 = 5, .POSTDIV2 = 5 });
-        // peripherals.PLL_USB.PWR.modify(.{ .POSTDIVPD = 0 });
-        // // Switch usbclk to be derived from PLLUSB
-        // peripherals.CLOCKS.CLK_USB_CTRL.modify(.{ .AUXSRC = .{ .value = .clksrc_pll_usb } });
-
-        // // We now have the stable 48MHz reference clock required for USB:
     }
 
     pub fn usb_init_device(device_config: *usb.DeviceConfiguration) void {
         _ = device_config;
-        // Bring USB out of reset
-        // resets.reset(.{ .usbctrl = true });
 
-        // Clear the control portion of DPRAM. This may not be necessary -- the
-        // datasheet is ambiguous -- but the C examples do it, and so do we.
+        // USB pullup (for bluepill devices with incorrect pull up resistor)
+        // http://amitesh-singh.github.io/stm32/2017/05/27/Overcoming-wrong-pullup-in-blue-pill.html        
+        // see https://www.mikrocontroller.net/articles/USB-Tutorial_mit_STM32
+        hal.gpio.set_output(USBD_PIN, hal.gpio.OutputMode.opendrain, hal.gpio.OutputSpeed.output_50MHz);
+        hal.gpio.write(USBD_PIN, hal.gpio.State.low);
+        hal.systick.delay_ms(80);
+        hal.gpio.set_input(USBD_PIN, hal.gpio.InputMode.floating);
 
-        // AF FIX
-        // peripherals.USBCTRL_DPRAM.SETUP_PACKET_LOW.write_raw(0);
-        // peripherals.USBCTRL_DPRAM.SETUP_PACKET_HIGH.write_raw(0);
+        // ENABLE USB
+        peripherals.RCC.APB1ENR.modify(.{ .USBEN = 0b1 });
+
+        // RESET USB
+        peripherals.RCC.APB1RSTR.modify(.{ .USBRST = 0b1 });
+        peripherals.RCC.APB1RSTR.modify(.{ .USBRST = 0b0 });
+
+        peripherals.USB.CNTR.modify(.{
+            .FRES = 0b1,
+        });
+        hal.systick.delay_ms(1);
+
+
+        peripherals.USB.CNTR.modify(.{
+            .PDWN = 0b1,
+        });
+
+        // tstartup = 1us
+        hal.systick.delay_ms(1);
+
+
+
+        peripherals.USB.CNTR.modify(.{
+            .CTRM = 0b1,
+            .RESETM = 0b1,
+            .ERRM = 0b1,
+            .SUSPM = 0b1,
+            .WKUPM = 0b1,
+        });
+
+
+
+        peripherals.USB.ISTR.modify(.{
+            .RESET = 0b0,
+        });
 
         // peripherals.USBCTRL_DPRAM.EP1_IN_CONTROL.write_raw(0);
         // peripherals.USBCTRL_DPRAM.EP1_OUT_CONTROL.write_raw(0);
@@ -393,17 +399,16 @@ pub const F = struct {
 
     /// Check which interrupt flags are set
     pub fn get_interrupts() usb.InterruptStatus {
-//        const ints = peripherals.USBCTRL_REGS.INTS.read();
+        //        const ints = peripherals.USBCTRL_REGS.INTS.read();
 
-         return .{
-         };
-    //         .BuffStatus = if (ints.BUFF_STATUS == 1) true else false,
-    //         .BusReset = if (ints.BUS_RESET == 1) true else false,
-    //         .DevConnDis = if (ints.DEV_CONN_DIS == 1) true else false,
-    //         .DevSuspend = if (ints.DEV_SUSPEND == 1) true else false,
-    //         .DevResumeFromHost = if (ints.DEV_RESUME_FROM_HOST == 1) true else false,
-    //         .SetupReq = if (ints.SETUP_REQ == 1) true else false,
-    //     };
+        return .{};
+        //         .BuffStatus = if (ints.BUFF_STATUS == 1) true else false,
+        //         .BusReset = if (ints.BUS_RESET == 1) true else false,
+        //         .DevConnDis = if (ints.DEV_CONN_DIS == 1) true else false,
+        //         .DevSuspend = if (ints.DEV_SUSPEND == 1) true else false,
+        //         .DevResumeFromHost = if (ints.DEV_RESUME_FROM_HOST == 1) true else false,
+        //         .SetupReq = if (ints.SETUP_REQ == 1) true else false,
+        //     };
     }
 
     /// Returns a received USB setup packet

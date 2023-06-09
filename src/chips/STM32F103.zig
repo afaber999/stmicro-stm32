@@ -51,7 +51,12 @@ pub const devices = struct {
             ADC1_2: Handler = unhandled,
             ///  USB High Priority or CAN TX interrupts
             USB_HP_CAN_TX: Handler = unhandled,
-            reserved34: [1]u32 = undefined,
+
+            /// AF ADDED
+            ///  CAN RX0 interrupt 20
+            CAN_RX0: Handler = unhandled,
+            // AF END
+
             ///  CAN RX1 interrupt
             CAN_RX1: Handler = unhandled,
             reserved36: [2]u32 = undefined,
